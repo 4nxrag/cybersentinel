@@ -48,146 +48,189 @@ function validatePayload(payload: AuditRequest): string | null {
 
 // Simple AI analysis using fetch
 async function analyzeCode(codeContent: string): Promise<AuditResult[]> {
-  const deepseekKey = Deno.env.get('DEEPSEEK_API_KEY');
+  const groqKey = Deno.env.get('GROQ_API_KEY');
   
-  if (!deepseekKey) {
-    console.error('DEEPSEEK_API_KEY not set');
+  if (!groqKey) {
+    console.error('GROQ_API_KEY not set');
     return [{
       file: 'configuration',
       line: 0,
       severity: 'Low' as const,
       issue: 'AI API key not configured',
-      fix_suggestion: 'Set DEEPSEEK_API_KEY in Supabase secrets',
+      fix_suggestion: 'Set GROQ_API_KEY in Supabase secrets',
     }];
   }
 
   const systemPrompt = `You are an elite cybersecurity auditor performing SAST (Static Application Security Testing). Analyze the provided code with EXTREME precision.
 
-YOUR TASK: Identify ONLY genuine security vulnerabilities from OWASP Top 10:
-1. SQL Injection (SQLi)
-2. Cross-Site Scripting (XSS)
-3. Broken Authentication
-4. Sensitive Data Exposure (hardcoded secrets, API keys, passwords)
-5. Security Misconfiguration
-6. Insecure Deserialization
-7. Using Components with Known Vulnerabilities
-8. Insufficient Logging & Monitoring
-9. Server-Side Request Forgery (SSRF)
-10. Command Injection
+**YOUR TASK:** Identify ONLY genuine security vulnerabilities from OWASP Top 10:
 
-CRITICAL RULES:
-- Be STRICT: Only flag ACTUAL vulnerabilities, not potential or theoretical ones
-- Provide EXACT line numbers where the vulnerability exists
-- Give ACTIONABLE fix suggestions (not generic advice)
+1. **SQL Injection (SQLi)** - Unsanitized user input in SQL queries
+2. **Cross-Site Scripting (XSS)** - Unescaped output to HTML/JavaScript
+3. **Broken Authentication** - Weak passwords, session fixation, insecure token storage
+4. **Sensitive Data Exposure** - Hardcoded API keys, passwords, secrets in code
+5. **Security Misconfiguration** - Debug mode enabled, default credentials
+6. **Insecure Deserialization** - Unsafe pickle/eval usage
+7. **Using Components with Known Vulnerabilities** - Outdated dependencies
+8. **Insufficient Logging & Monitoring** - Missing security event logging
+9. **Server-Side Request Forgery (SSRF)** - Unvalidated URL fetching
+10. **Command Injection** - Unsanitized shell execution
+
+**CRITICAL RULES:**
+- Be STRICT: Only flag ACTUAL vulnerabilities with exploitable code
+- Provide EXACT line numbers (count from 1)
+- Give ACTIONABLE fixes with code examples
+- Ignore comments, test files, and false positives
 - Focus on HIGH IMPACT issues
-- Ignore false positives (example code, comments, test files)
 
-OUTPUT FORMAT (strict JSON, no markdown, no explanations):
+**OUTPUT FORMAT (strict JSON only, no markdown):**
 [
   {
-    "file": "snippet",
-    "line": 5,
+    "file": "auth/login.js",
+    "line": 23,
     "severity": "Critical",
-    "issue": "SQL Injection via string concatenation in database query",
-    "fix_suggestion": "Replace with prepared statement: db.query('SELECT * FROM users WHERE id = ?', [userId])"
+    "issue": "SQL Injection via string concatenation in login query",
+    "fix_suggestion": "Use parameterized query: db.query('SELECT * FROM users WHERE email = $1', [email])"
+  },
+  {
+    "file": "config/secrets.ts",
+    "line": 5,
+    "severity": "High",
+    "issue": "Hardcoded AWS secret key exposed in source code",
+    "fix_suggestion": "Move to environment variables: process.env.AWS_SECRET_KEY"
   }
 ]
 
-SEVERITY LEVELS:
-- Critical: Directly exploitable (SQLi, RCE, auth bypass)
-- High: Significant risk (exposed secrets, weak crypto)
-- Low: Best practice violations (missing validation, weak logging)
+**SEVERITY LEVELS:**
+- **Critical**: Directly exploitable (SQLi, RCE, auth bypass, hardcoded secrets)
+- **High**: Significant risk (XSS, weak crypto, exposed endpoints)
+- **Low**: Best practice violations (missing validation, weak logging)
 
-If code is secure, return empty array: []`;
+If code is secure, return empty array: []
+
+**CODE TO ANALYZE:**
+`;
 
   try {
-    console.log('Starting DeepSeek security analysis...');
+    console.log('🚀 Starting Groq security analysis (Llama 3.3 70B)...');
     
-    const truncatedCode = codeContent.slice(0, 15000);
+    // Truncate to fit context window (Groq supports 128K tokens)
+    const maxCodeLength = 100000;
+    const truncatedCode = codeContent.slice(0, maxCodeLength);
     
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    if (codeContent.length > maxCodeLength) {
+      console.log(`⚠️  Code truncated: ${codeContent.length} → ${maxCodeLength} chars`);
+    }
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${deepseekKey}`,
+        'Authorization': `Bearer ${groqKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { 
-            role: 'user', 
-            content: 'Analyze this code for security vulnerabilities:\n\n' + truncatedCode
-          }
+          { role: 'user', content: truncatedCode }
         ],
         temperature: 0.1,
-        max_tokens: 3000,
+        max_tokens: 8192,
         top_p: 0.95,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('DeepSeek API error:', response.status, errorText);
-      throw new Error(`DeepSeek API returned ${response.status}`);
+      console.error('❌ Groq API error:', response.status, errorText);
+      throw new Error(`Groq API returned ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('DeepSeek response received');
-    
-    let content = data.choices[0].message.content || '[]';
-    console.log('Raw response:', content.slice(0, 500));
-    
-    // Clean markdown - FIXED REGEX
-    const codeBlockPattern = /```(?:json)?/gi;
-    content = content
-      .replace(codeBlockPattern, '')
-      .trim();
-    
-    // Extract JSON array
+    console.log('✅ Groq response received');
+
+    // Extract content from Groq response
+    if (!data.choices || data.choices.length === 0) {
+      console.error('❌ No choices in response:', data);
+      return [];
+    }
+
+    let content = data.choices[0].message?.content || '[]';
+    console.log('📄 Raw response preview:', content.slice(0, 200));
+
+    // Clean markdown code blocks
+content = content
+  .replace(/```javascript\s*/gi, '')
+  .replace(/```/g, '')
+  .trim();
+
+
+    // Extract JSON array (handles extra text before/after)
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       content = jsonMatch;
     }
-    
-    console.log('Cleaned content:', content);
-    
-    // Parse findings with error handling
+
+    console.log('🧹 Cleaned content:', content.slice(0, 300));
+
+    // Parse findings
     let findings: any[];
     try {
       findings = JSON.parse(content);
     } catch (parseError) {
-      console.error('JSON parse failed, attempting repair...');
+      console.error('⚠️  JSON parse failed, attempting repair...');
       // Fix common JSON issues
       content = content
-        .replace(/,\s*\]/g, ']')
-        .replace(/,\s*\}/g, '}')
-        .replace(/'/g, '"');
-      findings = JSON.parse(content);
+        .replace(/,\s*]/g, ']')      // Remove trailing commas in arrays
+        .replace(/,\s*}/g, '}')      // Remove trailing commas in objects
+        .replace(/'/g, '"')          // Replace single quotes
+        .replace(/\n/g, ' ');        // Remove newlines
+      
+      try {
+        findings = JSON.parse(content);
+      } catch (retryError) {
+        console.error('❌ JSON parse failed after repair:', content);
+        return [{
+          file: 'parser',
+          line: 0,
+          severity: 'Low' as const,
+          issue: 'Failed to parse AI response',
+          fix_suggestion: 'Check Edge Function logs for details',
+        }];
+      }
     }
-    
+
     if (!Array.isArray(findings)) {
-      console.error('Response was not an array');
+      console.error('❌ Response is not an array:', findings);
       return [];
     }
 
-    // Validate and normalize
+    // Validate and normalize findings
     const validatedFindings = findings
       .filter((f: any) => f.issue && f.severity)
       .map((f: any) => ({
-        file: String(f.file || 'snippet'),
+        file: String(f.file || 'unknown'),
         line: Math.max(1, parseInt(f.line) || 1),
         severity: ['Critical', 'High', 'Low'].includes(f.severity) ? f.severity : 'Low',
-        issue: String(f.issue).slice(0, 200),
-        fix_suggestion: String(f.fix_suggestion || 'Review and address this vulnerability').slice(0, 300),
+        issue: String(f.issue).slice(0, 250),
+        fix_suggestion: String(f.fix_suggestion || 'Review and address this vulnerability').slice(0, 400),
       }));
 
-    console.log(`Analysis complete: ${validatedFindings.length} vulnerabilities found`);
+    console.log(`🎯 Analysis complete: ${validatedFindings.length} vulnerabilities found`);
+    
+    // Log summary by severity
+    const summary = validatedFindings.reduce((acc: any, f: any) => {
+      acc[f.severity] = (acc[f.severity] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('📊 Severity breakdown:', summary);
+
     return validatedFindings;
 
   } catch (error: any) {
-    console.error('DeepSeek analysis error:', error.message);
-    
+    console.error('❌ Groq analysis error:', error.message);
+    console.error('Full error:', error);
+
     return [{
       file: 'error',
       line: 0,
@@ -200,7 +243,9 @@ If code is secure, return empty array: []`;
 
 
 
-// GitHub fetcher
+
+
+// GitHub fetcher with DevSecOps priorities
 async function fetchGitHubRepo(repoUrl: string): Promise<{ file: string; content: string }[]> {
   const urlPattern = /github\.com\/([^\/]+)\/([^\/]+)/;
   const match = repoUrl.match(urlPattern);
@@ -222,6 +267,27 @@ async function fetchGitHubRepo(repoUrl: string): Promise<{ file: string; content
     headers['Authorization'] = `token ${githubToken}`;
   }
 
+    //  Added timeout wrapper
+  const fetchWithTimeout = async (url: string, timeout = 10000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(url, { 
+        headers, 
+        signal: controller.signal 
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('GitHub API timeout - repository may be too large');
+      }
+      throw error;
+    }
+  };
+
   // Get repo info
   const repoResponse = await fetch(apiBase, { headers });
   if (!repoResponse.ok) {
@@ -238,38 +304,135 @@ async function fetchGitHubRepo(repoUrl: string): Promise<{ file: string; content
   }
 
   const treeData = await treeResponse.json();
-  const files: { file: string; content: string }[] = [];
-  const supportedExtensions = ['.js', '.ts', '.py', '.jsx', '.tsx'];
   
-  // Limit to first 10 files for demo
-  let count = 0;
+  // ✅ PRIORITY PATTERNS (scan these FIRST - auth & security critical)
+  const highPriorityPatterns = [
+    /auth/i,
+    /login/i,
+    /signin/i,
+    /signup/i,
+    /jwt/i,
+    /token/i,
+    /password/i,
+    /session/i,
+    /credential/i,
+    /oauth/i,
+    /api\/.*key/i,
+  ];
+  
+  const mediumPriorityPatterns = [
+    /middleware/i,
+    /route/i,
+    /api/i,
+    /security/i,
+    /config/i,
+    /\.env/i,
+    /database/i,
+    /db/i,
+  ];
+  
+  // ✅ EXCLUDE PATTERNS (skip these entirely)
+  const excludePatterns = [
+    /node_modules\//,
+    /\.git\//,
+    /dist\//,
+    /build\//,
+    /out\//,
+    /\.next\//,
+    /coverage\//,
+    /\.vscode\//,
+    /\.idea\//,
+    /__pycache__\//,
+    /\.pytest_cache\//,
+    /venv\//,
+    /env\//,
+    /__tests__\//,
+    /\.test\.[jt]sx?$/,
+    /\.spec\.[jt]sx?$/,
+    /test\//i,
+    /package-lock\.json$/,
+    /yarn\.lock$/,
+    /pnpm-lock\.yaml$/,
+    /\.min\./,
+    /\.bundle\./,
+    /\.map$/,
+  ];
+  
+  const supportedExtensions = ['.js', '.ts', '.py', '.jsx', '.tsx', '.go', '.java', '.php', '.rb'];
+  
+  const highPriorityFiles: any[] = [];
+  const mediumPriorityFiles: any[] = [];
+  const regularFiles: any[] = [];
+  
+  // Categorize files by priority
   for (const item of treeData.tree || []) {
-    if (count >= 10) break;
+    if (item.type !== 'blob') continue;
     
-    if (item.type === 'blob' && supportedExtensions.some(ext => item.path.endsWith(ext))) {
-      try {
-        const fileResponse = await fetch(item.url, { headers });
-        if (fileResponse.ok) {
-          const fileData = await fileResponse.json();
-          let content = fileData.content;
-          
-          if (fileData.encoding === 'base64') {
-            content = atob(content.replace(/\n/g, ''));
-          }
-          
-          files.push({ file: item.path, content });
-          count++;
+    // Skip excluded paths
+    if (excludePatterns.some(pattern => pattern.test(item.path))) {
+      continue;
+    }
+    
+    // Only supported extensions
+    if (!supportedExtensions.some(ext => item.path.endsWith(ext))) {
+      continue;
+    }
+    
+    // Categorize by priority
+    if (highPriorityPatterns.some(pattern => pattern.test(item.path))) {
+      highPriorityFiles.push(item);
+    } else if (mediumPriorityPatterns.some(pattern => pattern.test(item.path))) {
+      mediumPriorityFiles.push(item);
+    } else {
+      regularFiles.push(item);
+    }
+  }
+  
+  // ✅ Smart file selection: prioritize security-critical files
+  // Take up to 12 high priority, 6 medium, 2 regular (total 20 files max)
+  const filesToScan = [
+    ...highPriorityFiles.slice(0, 12),
+    ...mediumPriorityFiles.slice(0, 6),
+    ...regularFiles.slice(0, 2),
+  ];
+  
+  console.log(`📊 File Analysis: ${highPriorityFiles.length} critical, ${mediumPriorityFiles.length} medium, ${regularFiles.length} regular`);
+  console.log(`🎯 Scanning ${filesToScan.length} files (prioritized)`);
+  
+  const files: { file: string; content: string }[] = [];
+  
+  for (const item of filesToScan) {
+    try {
+      const fileResponse = await fetch(item.url, { headers });
+      if (fileResponse.ok) {
+        const fileData = await fileResponse.json();
+        let content = fileData.content;
+        
+        if (fileData.encoding === 'base64') {
+          content = atob(content.replace(/\n/g, ''));
         }
-      } catch (error) {
-        console.error(`Error fetching ${item.path}:`, error);
+        
+        // Skip overly large files (> 100KB)
+        if (content.length > 100000) {
+          console.log(`⚠️  Skipping large file: ${item.path}`);
+          continue;
+        }
+        
+        files.push({ 
+          file: item.path, 
+          content: content 
+        });
       }
+    } catch (error) {
+      console.error(`❌ Error fetching ${item.path}:`, error);
     }
   }
 
   if (files.length === 0) {
-    throw new Error('No supported code files found');
+    throw new Error('No supported code files found in repository');
   }
 
+  console.log(`✅ Successfully fetched ${files.length} files for analysis`);
   return files;
 }
 
@@ -294,7 +457,7 @@ serve(async (req: Request) => {
     if (payload.type === 'repo') {
       try {
         const files = await fetchGitHubRepo(payload.content);
-        codeToAnalyze = files.map((f) => `--- ${f.file} ---\n${f.content}`).join('\n\n');
+        codeToAnalyze = files.map((f) => `--- FILE: ${f.file} ---\n${f.content}`).join('\n\n');
       } catch (error: any) {
         return new Response(
           JSON.stringify({ 

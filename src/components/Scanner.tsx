@@ -54,20 +54,47 @@ const handleScan = async () => {
   }
 
   try {
-    const { data, error: fnError } = await supabase.functions.invoke('audit-code', {
-      body: { type: mode, content: content },
+    console.log('🚀 Calling Edge Function...');
+
+    // ✅ FIXED: Use fetch directly with anon key instead of supabase.functions.invoke
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/audit-code`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, // ✅ Use anon key
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        type: mode,
+        content: content,
+      }),
     });
 
-    if (fnError) throw new Error(fnError.message);
-    if (!data) throw new Error('No response');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Scan failed (${response.status}): ${errorText}`);
+    }
 
+    const data = await response.json();
+
+    if (!data || !data.success) {
+      throw new Error('Invalid response from server');
+    }
+
+    console.log('✅ Scan complete:', data);
     setResults(data);
+
   } catch (err: any) {
-    setError(err.message || 'Scan failed');
+    console.error('❌ Scan error:', err);
+    setError(err.message || 'An error occurred during scanning');
   } finally {
     setLoading(false);
   }
 };
+
 
 
 
