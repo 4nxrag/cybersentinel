@@ -127,7 +127,7 @@ export default function Dashboard() {
     <div className="p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-<h1 className="text-4xl font-bold text-black">
+<h1 className="text-3xl font-bold text-gray-800">
   Security Dashboard
 </h1>
 
