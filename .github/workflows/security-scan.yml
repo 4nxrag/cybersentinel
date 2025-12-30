@@ -1,0 +1,96 @@
+name: CyberSentinel Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    name: AI Security Analysis
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run CyberSentinel Scan
+        id: scan
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/audit-code" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -d '{
+              "type": "repo",
+              "content": "${{ github.server_url }}/${{ github.repository }}"
+            }')
+          
+          echo "$RESPONSE" | jq '.' > scan-results.json
+          cat scan-results.json
+          
+          CRITICAL=$(echo "$RESPONSE" | jq -r '.summary.critical // 0')
+          HIGH=$(echo "$RESPONSE" | jq -r '.summary.high // 0')
+          TOTAL=$(echo "$RESPONSE" | jq -r '.summary.total // 0')
+          
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          
+          echo "### 🔒 CyberSentinel Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Issues:** $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔴 Critical: $CRITICAL" >> $GITHUB_STEP_SUMMARY
+          echo "- 🟠 High: $HIGH" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: scan-results.json
+      
+      - name: Security Gate - Fail on Critical
+        if: steps.scan.outputs.critical > 0
+        run: |
+          echo "❌ SECURITY GATE FAILED: ${{ steps.scan.outputs.critical }} critical vulnerabilities detected"
+          exit 1
+      
+      - name: Comment PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            let results;
+            try {
+              results = JSON.parse(fs.readFileSync('scan-results.json', 'utf8'));
+            } catch(e) {
+              console.log('Could not read results');
+              return;
+            }
+            
+            let comment = '## 🔒 CyberSentinel Security Scan Results\n\n';
+            comment += `**Status:** ${results.summary.critical > 0 ? '❌ Failed' : '✅ Passed'}\n\n`;
+            comment += `| Severity | Count |\n`;
+            comment += `|----------|-------|\n`;
+            comment += `| 🔴 Critical | ${results.summary.critical} |\n`;
+            comment += `| 🟠 High | ${results.summary.high} |\n`;
+            comment += `| 🟡 Low | ${results.summary.low} |\n`;
+            comment += `| **Total** | **${results.summary.total}** |\n\n`;
+            
+            if (results.findings && results.findings.length > 0) {
+              comment += '### Top Issues:\n\n';
+              results.findings.slice(0, 5).forEach((f, i) => {
+                comment += `${i+1}. **${f.severity}** - \`${f.file || 'Unknown'}:${f.line || '?'}\`\n`;
+                comment += `   ${f.issue}\n\n`;
+              });
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
