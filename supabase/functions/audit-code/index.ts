@@ -4,6 +4,18 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
+const supabaseAdmin = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
+
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -482,6 +494,32 @@ serve(async (req: Request) => {
       },
       { critical: 0, high: 0, low: 0 }
     );
+
+    // Save scan to history
+try {
+  const { error: historyError } = await supabaseAdmin
+    .from('scan_history')
+    .insert({
+      repo_name: payload.type === 'repo' 
+        ? payload.content.split('/').slice(-2).join('/') // e.g., "username/repo"
+        : 'code-snippet',
+      repo_url: payload.type === 'repo' ? payload.content : null,
+      total_issues: findings.length,
+      critical_count: severityCounts.critical,
+      high_count: severityCounts.high,
+      low_count: severityCounts.low,
+      findings: findings,
+      status: 'completed',
+    });
+
+  if (historyError) {
+    console.error('Failed to save scan history:', historyError);
+  }
+} catch (err) {
+  console.error('Error saving history:', err);
+  // Don't fail the request if history save fails
+}
+
 
     return new Response(
       JSON.stringify({

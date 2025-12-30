@@ -36,9 +36,7 @@ export default function Scanner() {
   const [results, setResults] = useState<AuditResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
+ 
 
 const handleScan = async () => {
   setLoading(true);
@@ -101,20 +99,6 @@ const handleScan = async () => {
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       {/* Header with Sign Out */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="w-10 h-10 text-blue-600" />
-          <h1 className="text-4xl font-bold">CyberSentinel</h1>
-        </div>
-        <button
-          onClick={handleSignOut}
-          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign Out
-        </button>
-      </div>
-      <p className="text-gray-600 text-center -mt-4">AI-Powered Security Vulnerability Auditor</p>
 
       {/* Scanner Interface */}
       <Tabs value={mode} onValueChange={(v) => setMode(v as 'repo' | 'snippet')} className="w-full">
