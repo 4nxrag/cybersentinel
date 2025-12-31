@@ -4,7 +4,7 @@
 
 I built this over a weekend because I wanted something that could scan my repos for vulnerabilities without paying for enterprise tools. Turned into a full production app with CI/CD, real-time scanning, and a dashboard that actually looks good.
 
-**Live Demo:** [Coming Soon](https://coming_soon.vercel.app) 
+**Live Demo:** [https://cybersentinel.app/](https://cybersentinel-seven.vercel.app/) 
 
 ---
 
