@@ -1,4 +1,3 @@
-// supabase/functions/audit-code/index.ts
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -34,7 +33,7 @@ interface AuditResult {
   fix_suggestion: string;
 }
 
-// Simple validation
+// Validation
 function validatePayload(payload: AuditRequest): string | null {
   if (!payload.type || !['repo', 'snippet'].includes(payload.type)) {
     return 'Invalid type. Must be "repo" or "snippet"';
@@ -58,7 +57,7 @@ function validatePayload(payload: AuditRequest): string | null {
   return null;
 }
 
-// Simple AI analysis using fetch
+// AI analysis using fetch
 async function analyzeCode(codeContent: string): Promise<AuditResult[]> {
   const groqKey = Deno.env.get('GROQ_API_KEY');
   
@@ -317,7 +316,7 @@ async function fetchGitHubRepo(repoUrl: string): Promise<{ file: string; content
 
   const treeData = await treeResponse.json();
   
-  // ✅ PRIORITY PATTERNS (scan these FIRST - auth & security critical)
+  //  PRIORITY PATTERNS (scan these FIRST - auth & security critical)
   const highPriorityPatterns = [
     /auth/i,
     /login/i,
@@ -343,7 +342,7 @@ async function fetchGitHubRepo(repoUrl: string): Promise<{ file: string; content
     /db/i,
   ];
   
-  // ✅ EXCLUDE PATTERNS (skip these entirely)
+  // EXCLUDE PATTERNS (skip these entirely)
   const excludePatterns = [
     /node_modules\//,
     /\.git\//,
@@ -400,7 +399,7 @@ async function fetchGitHubRepo(repoUrl: string): Promise<{ file: string; content
     }
   }
   
-  // ✅ Smart file selection: prioritize security-critical files
+  // Smart file selection: prioritize security-critical files
   // Take up to 12 high priority, 6 medium, 2 regular (total 20 files max)
   const filesToScan = [
     ...highPriorityFiles.slice(0, 12),

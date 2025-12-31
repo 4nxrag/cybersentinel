@@ -1,4 +1,3 @@
-// src/components/ReportCard.tsx
 import { AlertTriangle, AlertCircle, Info } from 'lucide-react';
 
 interface Finding {

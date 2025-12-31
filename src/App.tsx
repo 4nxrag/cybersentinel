@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
@@ -65,9 +64,9 @@ function App() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Shield className="h-10 w-10 text-blue-600" />
-          <h1 className="text-5xl font-bold text-black">
-  CyberSentinel
-</h1>
+            <h1 className="text-5xl font-bold text-black">
+              CyberSentinel
+            </h1>
           </div>
           <p className="text-gray-600 text-lg">AI-Powered DevSecOps Agent</p>
         </div>

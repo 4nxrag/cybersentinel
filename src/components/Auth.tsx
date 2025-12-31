@@ -1,14 +1,16 @@
-// src/components/Auth.tsx
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Shield, Mail, Lock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Eye, EyeOff } from 'lucide-react';
+
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
@@ -88,25 +90,47 @@ export default function Auth() {
               />
             </div>
 
-            {/* Password */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Lock className="w-4 h-4" />
-                Password
-              </label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                minLength={6}
-              />
-              {isSignUp && (
-                <p className="text-xs text-gray-500">Minimum 6 characters</p>
-              )}
-            </div>
+{/* Password */}
+<div className="space-y-2">
+  <label className="text-sm font-medium flex items-center gap-2">
+    <Lock className="w-4 h-4" />
+    Password
+  </label>
+  <div className="relative">
+    <Input
+      type={showPassword ? "text" : "password"}
+      placeholder="••••••••"
+      value={password}
+        onChange={(e) => {
+    // Remove ALL spaces (leading, trailing, middle)
+    const noSpaces = e.target.value.replace(/\s/g, '');
+    setPassword(noSpaces);
+  }}
+      required
+      disabled={loading}
+      minLength={6}
+      className="pr-10"  
+    />
+    <Button
+      type="button"
+      variant="default"
+      size="default"
+      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-transparent"
+      onClick={() => setShowPassword(!showPassword)}
+      disabled={loading}
+    >
+      {showPassword ? (
+        <EyeOff className="h-4 w-4" />
+      ) : (
+        <Eye className="h-4 w-4" />
+      )}
+    </Button>
+  </div>
+  {isSignUp && (
+    <p className="text-xs text-gray-500">Minimum 6 characters</p>
+  )}
+</div>
+
 
             {/* Submit Button */}
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
@@ -155,10 +179,7 @@ export default function Auth() {
           </div>
         </div>
 
-        {/* Demo Credentials (Optional - Remove in production!) */}
-        <div className="mt-4 text-center text-xs text-gray-500">
-          <p>Demo: test@example.com / password123</p>
-        </div>
+
       </div>
     </div>
   );
