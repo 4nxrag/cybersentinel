@@ -69,7 +69,7 @@ function App() {
   CyberSentinel
 </h1>
           </div>
-          <p className="text-gray-600 text-lg">AI-DevSecOps Agent</p>
+          <p className="text-gray-600 text-lg">AI-Powered DevSecOps Agent</p>
         </div>
 
         {/* Main Tabs */}
