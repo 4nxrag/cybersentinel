@@ -4,8 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Shield, Github, Code, AlertTriangle, Loader2, LogOut } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { Shield, Github, Code, AlertTriangle, Loader2 } from 'lucide-react';
 import ReportCard from './ReportCard';
 
 interface Finding {
