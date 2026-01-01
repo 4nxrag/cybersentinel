@@ -80,7 +80,7 @@ Switched to DeepSeek API thinking it'd be cheaper. Got **constant 401 errors**. 
 Tried Gemini 1.5. Better pricing, but kept getting timeout errors on larger repos. Response times were 15-20 seconds which killed the UX.
 
 ### Final Solution: Groq
-Someone on Twitter mentioned Groq's inference speed. Tried it and **holy shit** - same Llama model running 10x faster. Sub-2 second response times. This is what made the project actually usable.
+Someone on Twitter mentioned Groq's inference speed. Tried it and boom **Performance Breakthrough** - same Llama model running 10x faster. Sub-2 second response times. This is what made the project actually usable.
 
 **Lesson learned:** Model hosting matters more than the model itself for real-time apps.
 

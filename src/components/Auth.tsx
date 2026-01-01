@@ -14,6 +14,14 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
+
+  const fillDemoCredentials = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    // Update these setters to match your actual state names
+    setEmail("test@example.com"); 
+    setPassword("password123");
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -132,6 +140,17 @@ export default function Auth() {
 </div>
 
 
+<div className="mb-4 flex justify-center">
+  <button
+    type="button"
+    onClick={fillDemoCredentials}
+    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-md border border-blue-100"
+  >
+    <span>🚀</span>
+    <span>Click here to auto-fill Demo Credentials</span>
+  </button>
+</div>
+
             {/* Submit Button */}
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? (
@@ -179,6 +198,11 @@ export default function Auth() {
           </div>
         </div>
 
+        {/* Demo credentials */}
+              
+          <div className="mt-4 text-center text-xs text-gray-500">
+                <p>Demo: test@example.com / password123</p>
+          </div>
 
       </div>
     </div>
