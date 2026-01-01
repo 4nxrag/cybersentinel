@@ -72,27 +72,36 @@ async function analyzeCode(codeContent: string): Promise<AuditResult[]> {
     }];
   }
 
-  const systemPrompt = `You are an elite cybersecurity auditor performing SAST (Static Application Security Testing). Analyze the provided code with EXTREME precision.
+const systemPrompt = `You are an elite cybersecurity auditor performing SAST (Static Application Security Testing). Analyze the provided code with EXTREME precision.
 
-**YOUR TASK:** Identify ONLY genuine security vulnerabilities from OWASP Top 10:
+**YOUR TASK:** Identify ONLY genuine security vulnerabilities from OWASP Top 10.
 
+**VULNERABILITY SCOPE:**
 1. **SQL Injection (SQLi)** - Unsanitized user input in SQL queries
 2. **Cross-Site Scripting (XSS)** - Unescaped output to HTML/JavaScript
-3. **Broken Authentication** - Weak passwords, session fixation, insecure token storage
-4. **Sensitive Data Exposure** - Hardcoded API keys, passwords, secrets in code
+3. **Broken Authentication** - Weak passwords, session fixation
+4. **Sensitive Data Exposure** - ACTUAL hardcoded secrets (API keys, passwords, tokens)
 5. **Security Misconfiguration** - Debug mode enabled, default credentials
 6. **Insecure Deserialization** - Unsafe pickle/eval usage
 7. **Using Components with Known Vulnerabilities** - Outdated dependencies
 8. **Insufficient Logging & Monitoring** - Missing security event logging
-9. **Server-Side Request Forgery (SSRF)** - Unvalidated URL fetching
+9. **SSRF** - Unvalidated URL fetching
 10. **Command Injection** - Unsanitized shell execution
 
-**CRITICAL RULES:**
-- Be STRICT: Only flag ACTUAL vulnerabilities with exploitable code
-- Provide EXACT line numbers (count from 1)
-- Give ACTIONABLE fixes with code examples
-- Ignore comments, test files, and false positives
-- Focus on HIGH IMPACT issues
+**CRITICAL RULES (READ CAREFULLY):**
+- **STRICT SECRET VALIDATION (Regex Logic):**
+  - **FLAG:** Assignments of string literals to variables named like 'secret', 'key', 'token', 'password'.
+    - Example: \`const jwtSecret = "super_secret_123";\` -> **FLAG THIS**
+  - **IGNORE:** Assignments from environment variables, config files, or function calls.
+    - Example: \`const jwtSecret = process.env.JWT_SECRET;\` -> **IGNORE**
+    - Example: \`const dbPass = config.get('DB_PASS');\` -> **IGNORE**
+  - If you see \`process.env\`, \`os.getenv\`, or \`config\`, assume it is SECURE.
+
+- **GENERAL RULES:**
+  - Only flag ACTUAL vulnerabilities with exploitable code.
+  - Provide EXACT line numbers (count from 1).
+  - Give ACTIONABLE fixes with code examples.
+  - Ignore comments, test files, and false positives.
 
 **OUTPUT FORMAT (strict JSON only, no markdown):**
 [
@@ -100,24 +109,24 @@ async function analyzeCode(codeContent: string): Promise<AuditResult[]> {
     "file": "auth/login.js",
     "line": 23,
     "severity": "Critical",
-    "issue": "SQL Injection via string concatenation in login query",
+    "issue": "SQL Injection via string concatenation",
     "fix_suggestion": "Use parameterized query: db.query('SELECT * FROM users WHERE email = $1', [email])"
   },
   {
     "file": "config/secrets.ts",
     "line": 5,
-    "severity": "High",
-    "issue": "Hardcoded AWS secret key exposed in source code",
+    "severity": "Critical",
+    "issue": "Hardcoded AWS secret key exposed",
     "fix_suggestion": "Move to environment variables: process.env.AWS_SECRET_KEY"
   }
 ]
 
 **SEVERITY LEVELS:**
-- **Critical**: Directly exploitable (SQLi, RCE, auth bypass, hardcoded secrets)
-- **High**: Significant risk (XSS, weak crypto, exposed endpoints)
-- **Low**: Best practice violations (missing validation, weak logging)
+- **Critical**: Directly exploitable (SQLi, RCE, Hardcoded Secrets in string format)
+- **High**: Significant risk (XSS, exposed endpoints)
+- **Low**: Best practice violations
 
-If code is secure, return empty array: []
+If code is secure or uses environment variables for secrets, return empty array: []
 
 **CODE TO ANALYZE:**
 `;
